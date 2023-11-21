@@ -1,0 +1,74 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
+
+from typing import List, Optional
+
+import fire
+
+from llama import Llama, Dialog
+
+
+def main(
+    ckpt_dir: str,
+    tokenizer_path: str,
+    temperature: float = 0.6,
+    top_p: float = 0.9,
+    max_seq_len: int = 512,
+    max_batch_size: int = 8,
+    max_gen_len: Optional[int] = None,
+):
+    """
+    Entry point of the program for generating text using a pretrained model.
+
+    Args:
+        ckpt_dir (str): The directory containing checkpoint files for the pretrained model.
+        tokenizer_path (str): The path to the tokenizer model used for text encoding/decoding.
+        temperature (float, optional): The temperature value for controlling randomness in generation.
+            Defaults to 0.6.
+        top_p (float, optional): The top-p sampling parameter for controlling diversity in generation.
+            Defaults to 0.9.
+        max_seq_len (int, optional): The maximum sequence length for input prompts. Defaults to 512.
+        max_batch_size (int, optional): The maximum batch size for generating sequences. Defaults to 8.
+        max_gen_len (int, optional): The maximum length of generated sequences. If None, it will be
+            set to the model's max sequence length. Defaults to None.
+    """
+    generator = Llama.build(
+        ckpt_dir=ckpt_dir,
+        tokenizer_path=tokenizer_path,
+        max_seq_len=max_seq_len,
+        max_batch_size=max_batch_size,
+    )
+
+    dialogs: List[Dialog] = [
+        #[
+            #{"role": "system", "content": "Always answer with ratings ranging from 1 to 5 stars, after providing the list of ranking, explain why you have this result"},
+            #{"role": "user", "content": "I am a scientist, I want to watch 3 movies, they are Matrix, Avatar, and Forest Gamp, what maybe the ratings from me?"},
+        #],
+        [
+            {"role": "system", "content": "Always answer with movie names and ratings from 0 to 5, and explain the reasons why he might make this rating"},
+            {"role":"user","content":"Tell me the rating score of the user for movie #1." },
+            {"role": "assistant", "content":"Here is the history of one user,the rating data is presented in this format:{movieID,rating} ,the movie data is in this format:{movieID,name,genres},ignore the spaces.The rating data:{1,4},{3,4},{6,4},{47,5} the movie data:{1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy},{3,Grumpier Old Men (1995),Comedy|Romance},{6,Heat (1995),Action|Crime|Thriller},{47,Seven (a.k.a. Se7en) (1995), Mystery|Thriller}"},
+              
+            {"role": "user", "content": "And tell me from user's past history, what are the possible ratings of these movies below:  Usual Suspects, The (1995), From Dusk Till Dawn (1996), explain the reasons why are these possible ratings for them? How will movie names and genres effect your rating predictions statistically?"},
+            {"role": "assistant", "content":"In general, when making predictions about a user's ratings , we can consider the following factors:* Genre: Users tend to prefer movies with genres that they have shown a preference for in the past.* Actors: Users may prefer movies that feature actors they enjoy watching, even if the movie's genre is different from what they usually watch.* Directors: Users may prefer movies directed by directors they have shown a preference for in the past.* Awards: Users may be more likely to watch and enjoy movies that have received awards or have been well-reviewed by critics."},
+            {"role": "user", "content": "How will movie names and genres effect your rating predictions statistically?"},
+        ], 
+    ]
+    results = generator.chat_completion(
+        dialogs,  # type: ignore
+        max_gen_len=max_gen_len,
+        temperature=temperature,
+        top_p=top_p,
+    )
+
+    for dialog, result in zip(dialogs, results):
+        for msg in dialog:
+            print(f"{msg['role'].capitalize()}: {msg['content']}\n")
+        print(
+            f"> {result['generation']['role'].capitalize()}: {result['generation']['content']}"
+        )
+        print("\n==================================\n")
+
+
+if __name__ == "__main__":
+    fire.Fire(main)
